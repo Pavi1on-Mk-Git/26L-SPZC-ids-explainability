@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "Paweł Kochański", email = "pawilioxion@gmail.com"},
 ]
-dependencies = []
+dependencies = ["numpy>=2.4.6", "polars>=1.40.1", "scikit-learn>=1.8.0", "imblearn>=0.0"]
 requires-python = "==3.13.*"
 readme = "README.md"
 license = {text = "MIT"}
@@ -13,3 +13,8 @@ license = {text = "MIT"}
 
 [tool.pdm]
 distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "-e file:///${PROJECT_ROOT}/#egg=26L-SPZC-ids-explainability",
+]
