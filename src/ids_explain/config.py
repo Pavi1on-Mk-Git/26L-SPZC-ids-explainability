@@ -22,6 +22,22 @@ class DataConfig:
         self.processed_data_dir = data_dir / "processed" / self.dataset_name
 
 
+@dataclass
+class OracleConfig:
+    hidden_dim: int
+    n_layers: int
+    dropout: float
+    learning_rate: float
+    batch_size: int
+    max_epochs: int
+    val_size: float
+    early_stopping_patience: int
+    early_stopping_monitor: str
+    random_seed: int
+    best_ckpt_name: str = "best_ckpt"
+    model_name: str = "oracle.pt"
+
+
 CICIDS2017_CONFIG = DataConfig(
     dataset_name="CICIDS2017",
     label_column="Label",
@@ -39,5 +55,18 @@ CICIDS2017_CONFIG = DataConfig(
     csv_null_values=["Infinity", "NaN"],
     pca_components=35,
     test_size=0.25,
+    random_seed=42,
+)
+
+DEFAULT_ORACLE_CONFIG = OracleConfig(
+    hidden_dim=512,
+    n_layers=5,
+    dropout=0.2,
+    learning_rate=1e-3,
+    batch_size=10_000,
+    max_epochs=100,
+    val_size=0.25,
+    early_stopping_patience=5,
+    early_stopping_monitor="val_loss",
     random_seed=42,
 )
