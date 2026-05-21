@@ -22,7 +22,7 @@ class OracleMLP(nn.Module):
         n_layers: int,
         n_classes: int,
         dropout: float,
-    ) -> None:
+    ):
         super().__init__()
         layers = []
         in_dim = input_dim
@@ -43,7 +43,7 @@ class OracleModule(LightningModule):
         n_classes: int,
         class_weights: Tensor,
         cfg: OracleConfig,
-    ) -> None:
+    ):
         super().__init__()
         self.cfg = cfg
         self.model = OracleMLP(input_dim, cfg.hidden_dim, cfg.n_layers, n_classes, cfg.dropout)
@@ -63,7 +63,7 @@ class OracleModule(LightningModule):
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         return loss
 
-    def validation_step(self, batch: tuple[Tensor, Tensor], _: int) -> None:
+    def validation_step(self, batch: tuple[Tensor, Tensor], _: int):
         loss, logits = self._shared_step(batch)
         preds = logits.argmax(dim=1)
         acc = (preds == batch[1]).float().mean()

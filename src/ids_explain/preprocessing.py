@@ -40,7 +40,7 @@ def apply_pipeline(pipeline: Pipeline, X: np.ndarray) -> np.ndarray:
     return pipeline.transform(X).astype(np.float32)
 
 
-def save_processed(data: ProcessedData, config: DataConfig) -> None:
+def save_processed(data: ProcessedData, config: DataConfig):
     config.processed_data_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         config.processed_data_dir / config.processed_data_name,

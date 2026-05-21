@@ -52,7 +52,7 @@ def _encode_labels(
     label_column: str,
 ) -> tuple[pl.DataFrame, dict[str, int]]:
     unique_labels: list[str] = sorted(df[label_column].unique().to_list())
-    label_map: dict[str, int] = {label: idx for idx, label in enumerate(unique_labels)}
+    label_map = {label: idx for idx, label in enumerate(unique_labels)}
     encoded = df.with_columns(
         pl.col(label_column).replace_strict(
             old=pl.Series(list(label_map.keys())),
@@ -104,19 +104,19 @@ def _undersample_majority(
     return sampler.fit_resample(X_train, y_train)
 
 
-def load_dataset(config: DataConfig) -> DatasetSplit:
-    lf = _scan_csvs(config.raw_data_dir, config.csv_null_values)
+def load_dataset(data_cfg: DataConfig) -> DatasetSplit:
+    lf = _scan_csvs(data_cfg.raw_data_dir, data_cfg.csv_null_values)
     lf = _strip_column_names(lf)
     lf = _replace_inf_with_null(lf)
-    lf = _filter_classes(lf, config.label_column, config.classes_to_keep)
+    lf = _filter_classes(lf, data_cfg.label_column, data_cfg.classes_to_keep)
     lf = lf.drop_nulls()
 
     df = lf.collect()
-    df, label_map = _encode_labels(df, config.label_column)
-    X, y, feature_names = _to_numpy(df, config.label_column)
+    df, label_map = _encode_labels(df, data_cfg.label_column)
+    X, y, feature_names = _to_numpy(df, data_cfg.label_column)
 
-    X_train, X_test, y_train, y_test = _stratified_split(X, y, config.test_size, config.random_seed)
-    X_train, y_train = _undersample_majority(X_train, y_train, config.random_seed)
+    X_train, X_test, y_train, y_test = _stratified_split(X, y, data_cfg.test_size, data_cfg.random_seed)
+    X_train, y_train = _undersample_majority(X_train, y_train, data_cfg.random_seed)
 
     return DatasetSplit(
         X_train=X_train,
