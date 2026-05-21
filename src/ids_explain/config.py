@@ -38,6 +38,20 @@ class OracleConfig:
     model_name: str = "oracle.pt"
 
 
+@dataclass
+class ExplainerConfig:
+    k_frac: float
+    tree_max_depth: int
+    n_search: int
+    data_dir_name: str = field(init=False)
+    centroids_name: str = "centroids.npy"
+    trees_name: str = "trees.joblib"
+    cluster_indices_name: str = "cluster_indices.joblib"
+
+    def __post_init__(self):
+        self.data_dir_name = f"explainer_k{self.k_frac}"
+
+
 CICIDS2017_CONFIG = DataConfig(
     dataset_name="CICIDS2017",
     label_column="Label",
@@ -70,3 +84,5 @@ DEFAULT_ORACLE_CONFIG = OracleConfig(
     early_stopping_monitor="val_loss",
     random_seed=42,
 )
+
+DEFAULT_EXPLAINER_CONFIG = ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3)
