@@ -33,7 +33,6 @@ class OracleConfig:
     val_size: float
     early_stopping_patience: int
     early_stopping_monitor: str
-    random_seed: int
     best_ckpt_name: str = "best_ckpt"
     model_name: str = "oracle.pt"
 
@@ -82,7 +81,6 @@ DEFAULT_ORACLE_CONFIG = OracleConfig(
     val_size=0.25,
     early_stopping_patience=5,
     early_stopping_monitor="val_loss",
-    random_seed=42,
 )
 
 DEFAULT_EXPLAINER_CONFIG = ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3)

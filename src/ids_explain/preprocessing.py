@@ -22,12 +22,12 @@ class ProcessedData:
     feature_names: list[str]
 
 
-def build_preprocessing_pipeline(n_components: int) -> Pipeline:
+def build_preprocessing_pipeline(n_components: int, random_seed: int) -> Pipeline:
     return Pipeline(
         [
             ("minmax", MinMaxScaler()),
             ("standard", StandardScaler()),
-            ("pca", PCA(n_components=n_components)),
+            ("pca", PCA(n_components=n_components, random_state=random_seed)),
         ]
     )
 
@@ -74,7 +74,7 @@ def load_processed(config: DataConfig) -> ProcessedData:
 
 
 def preprocess(split: DatasetSplit, config: DataConfig) -> ProcessedData:
-    pipeline = build_preprocessing_pipeline(config.pca_components)
+    pipeline = build_preprocessing_pipeline(config.pca_components, config.random_seed)
     X_train_pca = fit_pipeline(pipeline, split.X_train)
     X_test_pca = apply_pipeline(pipeline, split.X_test)
 

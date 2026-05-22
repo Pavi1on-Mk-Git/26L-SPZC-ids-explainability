@@ -21,7 +21,7 @@ def _centroid(X: np.ndarray) -> np.ndarray:
     return X.mean(axis=0)
 
 
-def train_explainer(data: ProcessedData, explainer_cfg: ExplainerConfig) -> Explainer:
+def train_explainer(data: ProcessedData, data_cfg: DataConfig, explainer_cfg: ExplainerConfig) -> Explainer:
     X, y = data.X_train_raw, data.y_train
     k = max(1, round(explainer_cfg.k_frac * len(X)))
 
@@ -34,7 +34,7 @@ def train_explainer(data: ProcessedData, explainer_cfg: ExplainerConfig) -> Expl
         X_cluster, y_cluster = X[indices], y[indices]
         centroids.append(_centroid(X_cluster))
 
-        tree = DecisionTreeClassifier(max_depth=explainer_cfg.tree_max_depth)
+        tree = DecisionTreeClassifier(max_depth=explainer_cfg.tree_max_depth, random_state=data_cfg.random_seed)
         tree.fit(X_cluster, y_cluster)
         trees.append(tree)
 

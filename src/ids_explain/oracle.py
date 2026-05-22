@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
-from lightning import LightningModule, Trainer
+from lightning import LightningModule, Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.utils.class_weight import compute_class_weight
 from torch import Tensor
@@ -104,9 +104,10 @@ def train_oracle(
     data_cfg: DataConfig,
     oracle_cfg: OracleConfig,
 ) -> OracleMLP:
+    seed_everything(data_cfg.random_seed)
     n_train = len(data.X_train_pca)
     val_size = int(n_train * oracle_cfg.val_size)
-    rng = np.random.default_rng(oracle_cfg.random_seed)
+    rng = np.random.default_rng(data_cfg.random_seed)
     val_idx = rng.choice(n_train, size=val_size, replace=False)
     train_mask = np.ones(n_train, dtype=bool)
     train_mask[val_idx] = False

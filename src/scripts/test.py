@@ -36,7 +36,7 @@ def full_main():
 
     save_oracle(oracle, CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG)
 
-    explainer = train_explainer(processed, DEFAULT_EXPLAINER_CONFIG)
+    explainer = train_explainer(processed, CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG)
 
     save_explainer(explainer, CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG)
 
