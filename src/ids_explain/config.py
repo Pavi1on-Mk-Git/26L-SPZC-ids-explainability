@@ -19,7 +19,7 @@ class DataConfig:
     def __post_init__(self):
         data_dir = Path("data")
         self.raw_data_dir = data_dir / "raw" / self.dataset_name
-        self.processed_data_dir = data_dir / "processed" / self.dataset_name
+        self.processed_data_dir = data_dir / "processed" / self.dataset_name / f"{self.random_seed}"
 
 
 @dataclass
