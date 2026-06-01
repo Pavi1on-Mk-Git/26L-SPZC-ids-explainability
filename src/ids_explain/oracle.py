@@ -118,7 +118,12 @@ def train_oracle(
     train_loader = _make_dataloader(X_train, y_train, oracle_cfg.batch_size, shuffle=True)
     val_loader = _make_dataloader(X_val, y_val, oracle_cfg.batch_size, shuffle=False)
 
-    module = OracleModule(input_dim=X_train.shape[1], n_classes=len(np.unique(y_train)), class_weights=_class_weights_tensor(y_train), cfg=oracle_cfg)
+    module = OracleModule(
+        input_dim=X_train.shape[1],
+        n_classes=len(np.unique(y_train)),
+        class_weights=_class_weights_tensor(y_train),
+        cfg=oracle_cfg,
+    )
 
     early_stop = EarlyStopping(
         monitor=oracle_cfg.early_stopping_monitor,
@@ -162,7 +167,13 @@ def load_oracle(
     oracle_cfg: OracleConfig,
 ) -> OracleMLP:
     path = data_cfg.processed_data_dir / oracle_cfg.model_name
-    module = OracleMLP(data_cfg.pca_components, oracle_cfg.hidden_dim, oracle_cfg.n_layers, len(data_cfg.classes_to_keep), oracle_cfg.dropout)
+    module = OracleMLP(
+        data_cfg.pca_components,
+        oracle_cfg.hidden_dim,
+        oracle_cfg.n_layers,
+        len(data_cfg.classes_to_keep),
+        oracle_cfg.dropout,
+    )
     module.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
     module.eval()
     return module

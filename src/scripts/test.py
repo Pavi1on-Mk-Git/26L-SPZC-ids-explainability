@@ -13,7 +13,9 @@ from ids_explain.visualize import explain_sample, save_svg
 def test(processed: ProcessedData, oracle: OracleMLP, explainer: Explainer):
     oracle_preds = predict(oracle, processed.X_test_pca, 10_000)
 
-    explainer_preds = predict_explainer(explainer, processed.X_test_raw, oracle_preds, DEFAULT_EXPLAINER_CONFIG.n_search)
+    explainer_preds = predict_explainer(
+        explainer, processed.X_test_raw, oracle_preds, DEFAULT_EXPLAINER_CONFIG.n_search
+    )
 
     print(f"Oracle accuracy: {np.mean(oracle_preds == processed.y_test)}")
     print(f"Explainer accuracy: {np.mean(explainer_preds == processed.y_test)}")
@@ -21,7 +23,13 @@ def test(processed: ProcessedData, oracle: OracleMLP, explainer: Explainer):
 
     sample_idx = 2137
 
-    tree = explain_sample(processed.X_test_raw[sample_idx], oracle_preds[sample_idx], explainer, processed, DEFAULT_EXPLAINER_CONFIG.n_search)
+    tree = explain_sample(
+        processed.X_test_raw[sample_idx],
+        oracle_preds[sample_idx],
+        explainer,
+        processed,
+        DEFAULT_EXPLAINER_CONFIG.n_search,
+    )
 
     save_svg(tree, Path.cwd() / "test")
 
