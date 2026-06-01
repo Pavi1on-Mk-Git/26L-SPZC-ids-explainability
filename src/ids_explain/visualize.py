@@ -51,7 +51,7 @@ def explain_sample(
         target_name="class",
         class_names=class_names,
     )
-    return viz_model.view(x=sample, show_just_path=False, fancy=True)
+    return viz_model.view(x=sample, show_just_path=False, fancy=True, fontname="Liberation Sans")
 
 
 def save_svg(render: dtreeviz.DTreeVizRender, path: Path):
