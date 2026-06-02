@@ -22,9 +22,3 @@ distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = ["-e file:///${PROJECT_ROOT}/#egg=26L-SPZC-ids-explainability"]
-
-[[tool.pdm.source]]
-name = "private"
-url = "https://download.pytorch.org/whl/cpu"
-include_packages = ["torch", "torchvision"]
-exclude_packages = ["*"]
