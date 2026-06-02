@@ -1,55 +1,75 @@
 import numpy as np
 
 
-def _sq_distances(X: np.ndarray, point: np.ndarray) -> np.ndarray:
+def _distance(X: np.ndarray, point: np.ndarray) -> np.ndarray:
+    """
+    Returns the squared Euclidean distance. MDAV only ever feeds this into
+    argmin / argmax, and squaring preserves ordering, so dropping the square
+    root does not change any result.
+    """
     diff = X - point
-    return np.einsum("ij,ij->i", diff, diff)
+    return (diff**2).sum(axis=1)
 
 
-def _knn_indices(distances: np.ndarray, k: int) -> np.ndarray:
-    return np.argpartition(distances, k - 1)[:k]
+def _mean_record(X: np.ndarray, members: np.ndarray) -> np.ndarray:
+    """The average vector (centroid) of the current set X."""
+    return X[members].mean(axis=0)
+
+
+def _argmax_distance(X: np.ndarray, members: np.ndarray, point: np.ndarray) -> int:
+    """argmax_{x_i in X} distance(x_i, point), returned as a global index."""
+    return int(members[_distance(X[members], point).argmax()])
+
+
+def _cluster(X: np.ndarray, members: np.ndarray, x: int, k: int) -> np.ndarray:
+    """Algorithm 3: cluster(x, k, X).
+
+    Builds a cluster of exactly k records around seed x. The reference grows
+    C = {x} by repeatedly moving the record of X nearest to x into C until
+    |C| = k. Because the distance is always measured to the fixed seed x,
+    this is exactly the seed plus its k - 1 nearest neighbours, so we can take
+    all k at once. Returns the global indices of the cluster's records.
+    """
+    dist = _distance(X[members], X[x])
+    nearest = np.argpartition(dist, k - 1)[:k]
+    return members[nearest]
 
 
 def mdav(X: np.ndarray, k: int) -> list[np.ndarray]:
+    """
+    Partitions X into clusters, each of size between k and 2k - 1, and returns
+    one array of global indices per cluster. Structure mirrors the reference
+    pseudocode line by line.
+    """
     n = len(X)
     if k < 1:
         raise ValueError(f"k must be >= 1, got {k}")
     if n < k:
         raise ValueError(f"Dataset size {n} is smaller than k={k}")
 
-    remaining: np.ndarray = np.arange(n)
-    clusters: list[np.ndarray] = []
+    X_remaining = np.arange(n)
+    C: list[np.ndarray] = []
 
-    while len(remaining) >= 3 * k:
-        subset = X[remaining]
+    while len(X_remaining) >= 3 * k:
+        x_c = _mean_record(X, X_remaining)
+        x_r = _argmax_distance(X, X_remaining, x_c)
+        x_s = _argmax_distance(X, X_remaining, X[x_r])
 
-        q = subset.mean(axis=0)
-        r_local: int = int(_sq_distances(subset, q).argmax())
+        C_r = _cluster(X, X_remaining, x_r, k)
+        X_remaining = np.setdiff1d(X_remaining, C_r, assume_unique=True)
+        C_s = _cluster(X, X_remaining, x_s, k)
+        X_remaining = np.setdiff1d(X_remaining, C_s, assume_unique=True)
 
-        dist_xr = _sq_distances(subset, subset[r_local])
-        s_local: int = int(dist_xr.argmax())
+        C.append(C_r)
+        C.append(C_s)
 
-        gr_local = _knn_indices(dist_xr, k)
-        gr_global = remaining[gr_local]
-        clusters.append(gr_global)
+    if 2 * k <= len(X_remaining) < 3 * k:
+        x_c = _mean_record(X, X_remaining)
+        x_r = _argmax_distance(X, X_remaining, x_c)
+        C_r = _cluster(X, X_remaining, x_r, k)
+        X_remaining = np.setdiff1d(X_remaining, C_r, assume_unique=True)
+        C.append(C_r)
+    else:
+        C.append(X_remaining)
 
-        after_gr = np.setdiff1d(remaining, gr_global, assume_unique=True)
-        subset_s = X[after_gr]
-        dist_xs = _sq_distances(subset_s, X[remaining[s_local]])
-        gs_local = _knn_indices(dist_xs, k)
-        gs_global = after_gr[gs_local]
-        clusters.append(gs_global)
-
-        remaining = np.setdiff1d(after_gr, gs_global, assume_unique=True)
-
-    if len(remaining) > 0:
-        if len(clusters) >= 2:
-            half = len(remaining) // 2
-            clusters[-2] = np.concatenate([clusters[-2], remaining[:half]])
-            clusters[-1] = np.concatenate([clusters[-1], remaining[half:]])
-        elif len(clusters) == 1:
-            clusters[-1] = np.concatenate([clusters[-1], remaining])
-        else:
-            clusters.append(remaining)
-
-    return clusters
+    return C

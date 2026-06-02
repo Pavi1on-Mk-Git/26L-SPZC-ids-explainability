@@ -73,7 +73,7 @@ def guided_search(
     n_search: int,
 ) -> tuple[int, DecisionTreeClassifier, int]:
     diff = explainer.centroids - sample
-    distances = np.einsum("ij,ij->i", diff, diff)
+    distances = (diff**2).sum(axis=1)
     sorted_indices = np.argsort(distances)
 
     for cluster_idx in sorted_indices[:n_search]:
