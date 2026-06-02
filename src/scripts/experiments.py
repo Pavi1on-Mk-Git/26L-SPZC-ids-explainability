@@ -70,7 +70,7 @@ def _report(
     print(classification_report(y_true, y_pred, target_names=class_names, digits=2))
 
 
-def main() -> None:
+def main():
     oracle_cfg = OracleConfig(
         hidden_dim=512,
         n_layers=5,
@@ -80,7 +80,7 @@ def main() -> None:
         max_epochs=100,
         val_size=0.25,
         early_stopping_patience=5,
-        early_stopping_monitor="train_loss",
+        early_stopping_monitor="val_loss",
     )
     explainer_cfg_coarse = ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3)
     explainer_cfg_fine = ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3)
