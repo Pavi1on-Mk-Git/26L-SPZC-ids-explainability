@@ -56,4 +56,9 @@ def explain_sample(
 
 def save_svg(render: dtreeviz.DTreeVizRender, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    render.save(str(path.with_suffix(".svg")))
+    svg_path = path.with_suffix(".svg")
+    render.save(str(svg_path))
+    # dtreeviz also writes the intermediate Graphviz DOT source (named after the
+    # stem, with no extension) and never removes it; clean it up.
+    dot_source = svg_path.with_suffix("")
+    dot_source.unlink(missing_ok=True)
