@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from lightning import LightningModule, Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
@@ -105,15 +106,14 @@ def train_oracle(
     oracle_cfg: OracleConfig,
 ) -> OracleMLP:
     seed_everything(data_cfg.random_seed)
-    n_train = len(data.X_train_pca)
-    val_size = int(n_train * oracle_cfg.val_size)
-    rng = np.random.default_rng(data_cfg.random_seed)
-    val_idx = rng.choice(n_train, size=val_size, replace=False)
-    train_mask = np.ones(n_train, dtype=bool)
-    train_mask[val_idx] = False
 
-    X_train, y_train = data.X_train_pca[train_mask], data.y_train[train_mask]
-    X_val, y_val = data.X_train_pca[val_idx], data.y_train[val_idx]
+    X_train, X_val, y_train, y_val = train_test_split(
+        data.X_train_pca,
+        data.y_train,
+        test_size=oracle_cfg.val_size,
+        random_state=data_cfg.random_seed,
+        stratify=data.y_train,
+    )
 
     train_loader = _make_dataloader(X_train, y_train, oracle_cfg.batch_size, shuffle=True)
     val_loader = _make_dataloader(X_val, y_val, oracle_cfg.batch_size, shuffle=False)

@@ -51,4 +51,4 @@ def loaded_main():
 
 
 if __name__ == "__main__":
-    loaded_main()
+    full_main()
