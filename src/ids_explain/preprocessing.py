@@ -41,6 +41,7 @@ def apply_pipeline(pipeline: Pipeline, X: np.ndarray) -> np.ndarray:
 
 
 def save_processed(data: ProcessedData, config: DataConfig):
+    config.write_or_verify_config()
     config.processed_data_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         config.processed_data_dir / config.processed_data_name,
@@ -59,6 +60,7 @@ def save_processed(data: ProcessedData, config: DataConfig):
 
 
 def load_processed(config: DataConfig) -> ProcessedData:
+    config.write_or_verify_config()
     arrays = np.load(config.processed_data_dir / config.processed_data_name)
     metadata = json.loads((config.processed_data_dir / config.processed_metadata_name).read_text())
     return ProcessedData(

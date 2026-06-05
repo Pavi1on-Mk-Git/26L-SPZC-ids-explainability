@@ -1,5 +1,9 @@
-from dataclasses import dataclass, field
+import hashlib
+import json
+from dataclasses import dataclass, field, fields
 from pathlib import Path
+
+CONFIG_FILE_NAME = "config.json"
 
 
 @dataclass
@@ -14,12 +18,36 @@ class DataConfig:
     processed_data_name: str = "data.npz"
     processed_metadata_name: str = "metadata.json"
     raw_data_dir: Path = field(init=False)
+    config_dir: Path = field(init=False)
     processed_data_dir: Path = field(init=False)
 
     def __post_init__(self):
         data_dir = Path("data")
         self.raw_data_dir = data_dir / "raw" / self.dataset_name
-        self.processed_data_dir = data_dir / "processed" / self.dataset_name / f"{self.random_seed}"
+        self.config_dir = data_dir / "processed" / self.dataset_name / self.config_hash()
+        self.processed_data_dir = self.config_dir / f"{self.random_seed}"
+
+    def to_dict(self) -> dict:
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.init and f.name != "random_seed"}
+
+    def config_hash(self) -> str:
+        payload = json.dumps(self.to_dict(), sort_keys=True)
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+    def write_or_verify_config(self) -> None:
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        config_path = self.config_dir / CONFIG_FILE_NAME
+        current = self.to_dict()
+        if config_path.exists():
+            existing = json.loads(config_path.read_text())
+            if existing != current:
+                raise ValueError(
+                    f"Config hash collision detected at {config_path}: the stored "
+                    f"config does not match the current config.\nstored:  {existing}\n"
+                    f"current: {current}"
+                )
+        else:
+            config_path.write_text(json.dumps(current, indent=4))
 
 
 @dataclass
