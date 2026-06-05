@@ -75,7 +75,7 @@ def load_processed(config: DataConfig) -> ProcessedData:
     )
 
 
-def preprocess(split: DatasetSplit, config: DataConfig) -> ProcessedData:
+def preprocess(split: DatasetSplit, config: DataConfig, save: bool = True) -> ProcessedData:
     pipeline = build_preprocessing_pipeline(config.pca_components, config.random_seed)
     X_train_pca = fit_pipeline(pipeline, split.X_train)
     X_test_pca = apply_pipeline(pipeline, split.X_test)
@@ -90,5 +90,6 @@ def preprocess(split: DatasetSplit, config: DataConfig) -> ProcessedData:
         label_map=split.label_map,
         feature_names=split.feature_names,
     )
-    save_processed(data, config)
+    if save:
+        save_processed(data, config)
     return data
