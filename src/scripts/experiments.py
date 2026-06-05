@@ -25,6 +25,7 @@ from ids_explain.preprocessing import ProcessedData, load_processed, preprocess
 
 RESULTS_DIR = Path("results")
 REPORT_NAME = "report.json"
+ORACLE_REPORT_NAME = "results_oracle.json"
 
 
 def _load_or_preprocess(data_cfg: DataConfig, save_processed_data: bool = True) -> ProcessedData:
@@ -85,7 +86,7 @@ def _aggregate(reports: list[dict]) -> dict:
     return aggregate
 
 
-def main(save_processed_data: bool = True):
+def main(save_processed_data: bool = True, include_explainers: bool = True):
     n_seeds = 5
     base_cfg = CICIDS2017_CONFIG
     oracle_cfg = OracleConfig(
@@ -99,14 +100,14 @@ def main(save_processed_data: bool = True):
         early_stopping_patience=5,
         early_stopping_monitor="val_loss",
     )
-    explainer_specs = [
-        (ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3), "Table III"),
-        (ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3), "Table IV"),
-    ]
+    explainer_specs = {
+        "k=0.2": ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3),
+        "k=0.005": ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3),
+    }
 
     runs: list[dict] = []
-    # Per-table classification reports across seeds, for aggregation.
-    collected: dict[str, list[dict]] = {}
+    oracle_reports: list[dict] = []
+    explainer_reports: dict[str, list[dict]] = {}
 
     for random_seed in range(n_seeds):
         data_cfg = replace(base_cfg, random_seed=random_seed)
@@ -114,60 +115,58 @@ def main(save_processed_data: bool = True):
 
         mlp = _load_or_train_oracle(data, data_cfg, oracle_cfg)
         oracle_preds = predict(mlp, data.X_test_pca, batch_size=oracle_cfg.batch_size)
-        oracle_title = "Oracle (ANN + PCA)  —  Table I"
         oracle_report = _report(data.y_test, oracle_preds, data.label_map)
-        collected.setdefault(oracle_title, []).append(oracle_report)
+        oracle_reports.append(oracle_report)
 
-        explainer_results = []
-        for explainer_cfg, table in explainer_specs:
-            explainer = _load_or_train_explainer(data, data_cfg, explainer_cfg)
-            explainer_preds = predict_explainer(
-                explainer, data.X_test_raw, oracle_preds, n_search=explainer_cfg.n_search
-            )
-            title = f"Explainer  k={explainer_cfg.k_frac}  —  {table}"
-            report = _report(data.y_test, explainer_preds, data.label_map)
-            collected.setdefault(title, []).append(report)
-            explainer_results.append(
-                {
-                    "table": table,
+        run = {
+            "seed": random_seed,
+            "data": {
+                "train": len(data.y_train),
+                "test": len(data.y_test),
+                "features_raw": data.X_train_raw.shape[1],
+                "features_pca": data.X_train_pca.shape[1],
+                "classes": len(data.label_map),
+            },
+            "oracle": oracle_report,
+        }
+
+        if include_explainers:
+            run["explainers"] = {}
+            for key, explainer_cfg in explainer_specs.items():
+                explainer = _load_or_train_explainer(data, data_cfg, explainer_cfg)
+                explainer_preds = predict_explainer(
+                    explainer, data.X_test_raw, oracle_preds, n_search=explainer_cfg.n_search
+                )
+                report = _report(data.y_test, explainer_preds, data.label_map)
+                explainer_reports.setdefault(key, []).append(report)
+                run["explainers"][key] = {
                     "k_frac": explainer_cfg.k_frac,
                     "clusters": len(explainer.trees),
                     "k": max(1, round(explainer_cfg.k_frac * len(data.X_train_raw))),
                     "oracle_agreement": float((explainer_preds == oracle_preds).mean()),
                     "report": report,
                 }
-            )
 
-        runs.append(
-            {
-                "seed": random_seed,
-                "data": {
-                    "train": len(data.y_train),
-                    "test": len(data.y_test),
-                    "features_raw": data.X_train_raw.shape[1],
-                    "features_pca": data.X_train_pca.shape[1],
-                    "classes": len(data.label_map),
-                },
-                "oracle": {"table": "Table I", "report": oracle_report},
-                "explainers": explainer_results,
-            }
-        )
+        runs.append(run)
+
+    config_block: dict = {"data": base_cfg.to_dict(), "oracle": asdict(oracle_cfg)}
+    aggregate: dict = {"oracle": _aggregate(oracle_reports)}
+    if include_explainers:
+        config_block["explainers"] = {key: asdict(explainer_cfg) for key, explainer_cfg in explainer_specs.items()}
+        aggregate["explainers"] = {key: _aggregate(reports) for key, reports in explainer_reports.items()}
 
     report = {
         "config_hash": base_cfg.config_hash(),
         "seeds": list(range(n_seeds)),
-        "config": {
-            "data": base_cfg.to_dict(),
-            "oracle": asdict(oracle_cfg),
-            "explainers": [asdict(cfg) for cfg, _ in explainer_specs],
-        },
+        "config": config_block,
         "runs": runs,
-        "aggregate": {title: _aggregate(reports) for title, reports in collected.items()},
+        "aggregate": aggregate,
     }
 
     results_dir = RESULTS_DIR / base_cfg.config_hash()
     results_dir.mkdir(parents=True, exist_ok=True)
-    (results_dir / REPORT_NAME).write_text(json.dumps(report, indent=4))
+    report_name = REPORT_NAME if include_explainers else ORACLE_REPORT_NAME
+    (results_dir / report_name).write_text(json.dumps(report, indent=4))
 
 
 if __name__ == "__main__":
@@ -175,8 +174,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-save-processed",
         action="store_true",
-        help="Do not write the processed dataset (data.npz/metadata.json) to disk; "
-        "preprocess in-memory each run instead.",
+        help="Do not write the processed dataset to disk; preprocess in-memory each run instead.",
+    )
+    parser.add_argument(
+        "--oracle-only",
+        action="store_true",
+        help="Only train and evaluate the oracle; skip explainer training and evaluation.",
     )
     args = parser.parse_args()
-    main(save_processed_data=not args.no_save_processed)
+    main(save_processed_data=not args.no_save_processed, include_explainers=not args.oracle_only)
