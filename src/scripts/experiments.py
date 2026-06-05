@@ -61,13 +61,47 @@ def _report(
     y_pred: np.ndarray,
     label_map: dict[str, int],
     title: str,
-) -> None:
+) -> dict:
     inv_label_map = {v: k for k, v in label_map.items()}
     class_names = [inv_label_map[i] for i in sorted(inv_label_map)]
     print(f"\n{'=' * 60}")
     print(f"  {title}")
     print(f"{'=' * 60}")
     print(classification_report(y_true, y_pred, target_names=class_names, digits=2))
+    return classification_report(
+        y_true, y_pred, target_names=class_names, output_dict=True, zero_division=0
+    )
+
+
+def _aggregate(title: str, reports: list[dict]) -> None:
+    """Print average ± standard deviation of every score across all collected runs for one table."""
+    n_runs = len(reports)
+    print(f"\n{'#' * 72}")
+    print(f"  AGGREGATE over {n_runs} run(s)  —  {title}")
+    print(f"{'#' * 72}")
+
+    # Ordered row keys (classes first, then summary rows), taken from the first run.
+    row_keys = list(reports[0].keys())
+    metrics = ["precision", "recall", "f1-score"]
+
+    header = f"{'':<22}" + "".join(f"{m:>22}" for m in metrics) + f"{'support':>10}"
+    print(header)
+    print(f"{'':<22}" + "".join(f"{'avg ± stdev':>22}" for _ in metrics) + f"{'':>10}")
+    print("-" * len(header))
+
+    for key in row_keys:
+        first = reports[0][key]
+        if isinstance(first, dict):
+            cells = ""
+            for m in metrics:
+                vals = [r[key][m] for r in reports]
+                cells += f"{f'{np.mean(vals):.2f} ± {np.std(vals):.2f}':>22}"
+            support = np.mean([r[key]["support"] for r in reports])
+            print(f"{key:<22}{cells}{support:>10,.0f}")
+        else:  # accuracy is a scalar
+            vals = [r[key] for r in reports]
+            cell = f"{np.mean(vals):.2f} ± {np.std(vals):.2f}"
+            print(f"{key:<22}{'':>22}{'':>22}{cell:>22}")
 
 
 def main():
@@ -84,6 +118,9 @@ def main():
     )
     explainer_cfg_coarse = ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3)
     explainer_cfg_fine = ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3)
+
+    # Collect the classification report of every table across all seeds for aggregation.
+    collected: dict[str, list[dict]] = {}
 
     for random_seed in range(5):
         data_cfg = DataConfig(
@@ -115,7 +152,10 @@ def main():
 
         mlp = _load_or_train_oracle(data, data_cfg, oracle_cfg)
         oracle_preds = predict(mlp, data.X_test_pca, batch_size=oracle_cfg.batch_size)
-        _report(data.y_test, oracle_preds, data.label_map, "Oracle (ANN + PCA)  —  Table I")
+        oracle_title = "Oracle (ANN + PCA)  —  Table I"
+        collected.setdefault(oracle_title, []).append(
+            _report(data.y_test, oracle_preds, data.label_map, oracle_title)
+        )
 
         for cfg, table in [
             (explainer_cfg_coarse, "Table III"),
@@ -123,17 +163,18 @@ def main():
         ]:
             explainer = _load_or_train_explainer(data, data_cfg, cfg)
             explainer_preds = predict_explainer(explainer, data.X_test_raw, oracle_preds, n_search=cfg.n_search)
-            _report(
-                data.y_test,
-                explainer_preds,
-                data.label_map,
-                f"Explainer  k={cfg.k_frac}  —  {table}",
+            title = f"Explainer  k={cfg.k_frac}  —  {table}"
+            collected.setdefault(title, []).append(
+                _report(data.y_test, explainer_preds, data.label_map, title)
             )
 
             n_clusters = len(explainer.trees)
             k_int = max(1, round(cfg.k_frac * len(data.X_train_raw)))
             agreement = (explainer_preds == oracle_preds).mean()
             print(f"  clusters={n_clusters}  k={k_int:,}  oracle-agreement={agreement:.2%}")
+
+    for title, reports in collected.items():
+        _aggregate(title, reports)
 
 
 if __name__ == "__main__":
