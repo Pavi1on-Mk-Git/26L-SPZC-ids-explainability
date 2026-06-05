@@ -31,12 +31,20 @@ def _strip_column_names(lf: pl.LazyFrame) -> pl.LazyFrame:
     return lf.rename(rename_map)
 
 
+def _drop_duplicate_columns(lf: pl.LazyFrame) -> pl.LazyFrame:
+    duplicate_cols = [name for name in lf.collect_schema().names() if "_duplicated_" in name]
+    return lf.drop(duplicate_cols) if duplicate_cols else lf
+
+
 def _replace_inf_with_null(lf: pl.LazyFrame) -> pl.LazyFrame:
     schema = lf.collect_schema()
     float_cols = [name for name, dtype in schema.items() if dtype in (pl.Float32, pl.Float64)]
     if not float_cols:
         return lf
-    return lf.with_columns(pl.when(pl.col(c).is_infinite() | pl.col(c).is_nan()).then(None).otherwise(pl.col(c)).alias(c) for c in float_cols)
+    return lf.with_columns(
+        pl.when(pl.col(c).is_infinite() | pl.col(c).is_nan()).then(None).otherwise(pl.col(c)).alias(c)
+        for c in float_cols
+    )
 
 
 def _filter_classes(
@@ -92,20 +100,35 @@ def _undersample_majority(
     X_train: np.ndarray,
     y_train: np.ndarray,
     random_seed: int,
+    majority_target: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     unique, counts = np.unique(y_train, return_counts=True)
-    majority_label = int(unique[counts.argmax()])
-    attack_total = int(counts.sum() - counts.max())
-    sampling_strategy = {majority_label: 2 * attack_total}
+    majority_idx = int(counts.argmax())
+    majority_label = int(unique[majority_idx])
+    majority_available = int(counts[majority_idx])
+
+    if not 0 < majority_target <= majority_available:
+        raise ValueError(
+            f"Majority undersampling target {majority_target:,} is out of range "
+            f"(1..{majority_available:,} available in the training split)."
+        )
+
     sampler = RandomUnderSampler(
-        sampling_strategy=sampling_strategy,
+        sampling_strategy={majority_label: majority_target},
         random_state=random_seed,
     )
     return sampler.fit_resample(X_train, y_train)
 
 
+def _majority_target_for_total(y_train: np.ndarray, n_test: int, target_total_samples: int) -> int:
+    _, counts = np.unique(y_train, return_counts=True)
+    non_majority = int(counts.sum() - counts.max())
+    return target_total_samples - n_test - non_majority
+
+
 def load_dataset(data_cfg: DataConfig) -> DatasetSplit:
     lf = _scan_csvs(data_cfg.raw_data_dir, data_cfg.csv_null_values)
+    lf = _drop_duplicate_columns(lf)
     lf = _strip_column_names(lf)
     lf = _replace_inf_with_null(lf)
     lf = _filter_classes(lf, data_cfg.label_column, data_cfg.classes_to_keep)
@@ -116,7 +139,10 @@ def load_dataset(data_cfg: DataConfig) -> DatasetSplit:
     X, y, feature_names = _to_numpy(df, data_cfg.label_column)
 
     X_train, X_test, y_train, y_test = _stratified_split(X, y, data_cfg.test_size, data_cfg.random_seed)
-    X_train, y_train = _undersample_majority(X_train, y_train, data_cfg.random_seed)
+    majority_target = None
+    if data_cfg.target_total_samples is not None:
+        majority_target = _majority_target_for_total(y_train, len(y_test), data_cfg.target_total_samples)
+    X_train, y_train = _undersample_majority(X_train, y_train, data_cfg.random_seed, majority_target)
 
     return DatasetSplit(
         X_train=X_train,

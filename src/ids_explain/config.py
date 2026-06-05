@@ -15,6 +15,7 @@ class DataConfig:
     pca_components: int
     test_size: float
     random_seed: int
+    target_total_samples: int | None = None
     processed_data_name: str = "data.npz"
     processed_metadata_name: str = "metadata.json"
     raw_data_dir: Path = field(init=False)
@@ -97,6 +98,7 @@ CICIDS2017_CONFIG = DataConfig(
     pca_components=35,
     test_size=0.25,
     random_seed=42,
+    target_total_samples=1_971_937,
 )
 
 DEFAULT_ORACLE_CONFIG = OracleConfig(
