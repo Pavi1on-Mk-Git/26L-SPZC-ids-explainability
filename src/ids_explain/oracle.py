@@ -107,16 +107,23 @@ def train_oracle(
 ) -> OracleMLP:
     seed_everything(data_cfg.random_seed)
 
-    X_train, X_val, y_train, y_val = train_test_split(
-        data.X_train_pca,
-        data.y_train,
-        test_size=oracle_cfg.val_size,
-        random_state=data_cfg.random_seed,
-        stratify=data.y_train,
-    )
+    monitor = oracle_cfg.early_stopping_monitor
+    use_validation = monitor.startswith("val")
+
+    if use_validation:
+        X_train, X_val, y_train, y_val = train_test_split(
+            data.X_train_pca,
+            data.y_train,
+            test_size=oracle_cfg.val_size,
+            random_state=data_cfg.random_seed,
+            stratify=data.y_train,
+        )
+        val_loader = _make_dataloader(X_val, y_val, oracle_cfg.batch_size, shuffle=False)
+    else:
+        X_train, y_train = data.X_train_pca, data.y_train
+        val_loader = None
 
     train_loader = _make_dataloader(X_train, y_train, oracle_cfg.batch_size, shuffle=True)
-    val_loader = _make_dataloader(X_val, y_val, oracle_cfg.batch_size, shuffle=False)
 
     module = OracleModule(
         input_dim=X_train.shape[1],
@@ -125,15 +132,20 @@ def train_oracle(
         cfg=oracle_cfg,
     )
 
+    mode = "max" if "acc" in monitor else "min"
     early_stop = EarlyStopping(
-        monitor=oracle_cfg.early_stopping_monitor,
+        monitor=monitor,
         patience=oracle_cfg.early_stopping_patience,
+        mode=mode,
+        check_on_train_epoch_end=not use_validation,
     )
     checkpoint = ModelCheckpoint(
         dirpath=data_cfg.processed_data_dir,
         filename=oracle_cfg.best_ckpt_name,
-        monitor=oracle_cfg.early_stopping_monitor,
+        monitor=monitor,
+        mode=mode,
         save_weights_only=True,
+        save_on_train_epoch_end=not use_validation,
     )
     trainer = Trainer(
         max_epochs=oracle_cfg.max_epochs,
