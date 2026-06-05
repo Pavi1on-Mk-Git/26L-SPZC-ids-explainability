@@ -31,7 +31,9 @@ ORACLE_REPORT_NAME = "results_oracle.json"
 def _load_or_preprocess(data_cfg: DataConfig, save_processed_data: bool = True) -> ProcessedData:
     processed_path = data_cfg.processed_data_dir / data_cfg.processed_data_name
     if processed_path.exists():
+        print("[data] loading preprocessed data from disk")
         return load_processed(data_cfg)
+    print(f"[data] preprocessing raw CSVs ({'caching to disk' if save_processed_data else 'in-memory'})")
     split = load_dataset(data_cfg)
     return preprocess(split, data_cfg, save=save_processed_data)
 
@@ -43,7 +45,9 @@ def _load_or_train_oracle(
 ) -> OracleMLP:
     oracle_path = data_cfg.processed_data_dir / oracle_cfg.model_name
     if oracle_path.exists():
+        print("[oracle] loading trained oracle from disk")
         return load_oracle(data_cfg, oracle_cfg)
+    print("[oracle] training from scratch")
     mlp = train_oracle(data, data_cfg, oracle_cfg)
     save_oracle(mlp, data_cfg, oracle_cfg)
     return mlp
@@ -56,7 +60,9 @@ def _load_or_train_explainer(
 ) -> Explainer:
     explainer_dir = data_cfg.processed_data_dir / explainer_cfg.data_dir_name
     if explainer_dir.exists():
+        print(f"[explainer k_frac={explainer_cfg.k_frac}] loading from disk")
         return load_explainer(data_cfg, explainer_cfg)
+    print(f"[explainer k_frac={explainer_cfg.k_frac}] training from scratch")
     explainer = train_explainer(data, data_cfg, explainer_cfg)
     save_explainer(explainer, data_cfg, explainer_cfg)
     return explainer
@@ -65,7 +71,11 @@ def _load_or_train_explainer(
 def _report(y_true: np.ndarray, y_pred: np.ndarray, label_map: dict[str, int]) -> dict:
     inv_label_map = {v: k for k, v in label_map.items()}
     class_names = [inv_label_map[i] for i in sorted(inv_label_map)]
-    return classification_report(y_true, y_pred, target_names=class_names, output_dict=True, zero_division=0)
+    report = classification_report(y_true, y_pred, target_names=class_names, output_dict=True, zero_division=0)
+    for value in report.values():
+        if isinstance(value, dict):
+            value.pop("support", None)
+    return report
 
 
 def _aggregate(reports: list[dict]) -> dict:
@@ -78,7 +88,6 @@ def _aggregate(reports: list[dict]) -> dict:
             for m in metrics:
                 vals = [r[key][m] for r in reports]
                 row[m] = {"mean": float(np.mean(vals)), "std": float(np.std(vals))}
-            row["support"] = float(np.mean([r[key]["support"] for r in reports]))
             aggregate[key] = row
         else:  # accuracy is a scalar
             vals = [r[key] for r in reports]
@@ -110,6 +119,7 @@ def main(save_processed_data: bool = True, include_explainers: bool = True):
     explainer_reports: dict[str, list[dict]] = {}
 
     for random_seed in range(n_seeds):
+        print(f"\n=== seed {random_seed + 1}/{n_seeds} ===")
         data_cfg = replace(base_cfg, random_seed=random_seed)
         data = _load_or_preprocess(data_cfg, save_processed_data=save_processed_data)
 
@@ -166,7 +176,9 @@ def main(save_processed_data: bool = True, include_explainers: bool = True):
     results_dir = RESULTS_DIR / base_cfg.config_hash()
     results_dir.mkdir(parents=True, exist_ok=True)
     report_name = REPORT_NAME if include_explainers else ORACLE_REPORT_NAME
-    (results_dir / report_name).write_text(json.dumps(report, indent=4))
+    out_path = results_dir / report_name
+    out_path.write_text(json.dumps(report, indent=4))
+    print(f"\n[results] wrote {out_path}")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
+from tqdm.auto import tqdm
 
 from .config import DataConfig, ExplainerConfig
 from .mdav import mdav
@@ -25,12 +26,12 @@ def train_explainer(data: ProcessedData, data_cfg: DataConfig, explainer_cfg: Ex
     X, y = data.X_train_raw, data.y_train
     k = max(1, round(explainer_cfg.k_frac * len(X)))
 
-    cluster_indices = mdav(X, k)
+    cluster_indices = mdav(X, k, progress=True)
 
     centroids = []
     trees = []
 
-    for indices in cluster_indices:
+    for indices in tqdm(cluster_indices, desc=f"Training trees (k_frac={explainer_cfg.k_frac})", unit="tree"):
         X_cluster, y_cluster = X[indices], y[indices]
         centroids.append(_centroid(X_cluster))
 
@@ -95,7 +96,8 @@ def predict_explainer(
     n_search: int,
 ) -> np.ndarray:
     preds = np.empty(len(X), dtype=np.int64)
-    for i, (sample, oracle_pred) in enumerate(zip(X, oracle_preds)):
+    iterator = tqdm(zip(X, oracle_preds), total=len(X), desc="Explainer predict", unit="sample")
+    for i, (sample, oracle_pred) in enumerate(iterator):
         pred, _, _ = guided_search(sample, int(oracle_pred), explainer, n_search)
         preds[i] = pred
     return preds

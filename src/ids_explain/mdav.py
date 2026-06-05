@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm.auto import tqdm
 
 
 def _distance(X: np.ndarray, point: np.ndarray) -> np.ndarray:
@@ -35,11 +36,12 @@ def _cluster(X: np.ndarray, members: np.ndarray, x: int, k: int) -> np.ndarray:
     return members[nearest]
 
 
-def mdav(X: np.ndarray, k: int) -> list[np.ndarray]:
+def mdav(X: np.ndarray, k: int, progress: bool = False) -> list[np.ndarray]:
     """
     Partitions X into clusters, each of size between k and 2k - 1, and returns
     one array of global indices per cluster. Structure mirrors the reference
-    pseudocode line by line.
+    pseudocode line by line. Set ``progress`` to show a tqdm bar over the
+    records as they are assigned to clusters.
     """
     n = len(X)
     if k < 1:
@@ -50,6 +52,7 @@ def mdav(X: np.ndarray, k: int) -> list[np.ndarray]:
     X_remaining = np.arange(n)
     C: list[np.ndarray] = []
 
+    bar = tqdm(total=n, desc=f"MDAV clustering (k={k})", unit="rec", disable=not progress)
     while len(X_remaining) >= 3 * k:
         x_c = _mean_record(X, X_remaining)
         x_r = _argmax_distance(X, X_remaining, x_c)
@@ -62,6 +65,8 @@ def mdav(X: np.ndarray, k: int) -> list[np.ndarray]:
 
         C.append(C_r)
         C.append(C_s)
+        bar.update(len(C_r) + len(C_s))
+        bar.set_postfix(clusters=len(C))
 
     if 2 * k <= len(X_remaining) < 3 * k:
         x_c = _mean_record(X, X_remaining)
@@ -69,7 +74,11 @@ def mdav(X: np.ndarray, k: int) -> list[np.ndarray]:
         C_r = _cluster(X, X_remaining, x_r, k)
         X_remaining = np.setdiff1d(X_remaining, C_r, assume_unique=True)
         C.append(C_r)
+        bar.update(len(C_r))
     else:
         C.append(X_remaining)
+        bar.update(len(X_remaining))
 
+    bar.set_postfix(clusters=len(C))
+    bar.close()
     return C
