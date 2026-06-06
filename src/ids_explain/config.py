@@ -56,21 +56,22 @@ class ExplainerConfig:
         return {f.name: getattr(self, f.name) for f in fields(self) if f.init and f.name != "k_frac"}
 
 
-def config_hash(data_cfg: DataConfig, oracle_cfg: OracleConfig, explainer_cfg: ExplainerConfig):
+def config_hash(data_cfg: DataConfig, oracle_cfg: OracleConfig, *explainer_cfgs: ExplainerConfig):
     payload = json.dumps(data_cfg.to_dict(), sort_keys=True)
     payload += json.dumps(oracle_cfg.to_dict(), sort_keys=True)
-    payload += json.dumps(explainer_cfg.to_dict(), sort_keys=True)
+    for explainer_payload in sorted({json.dumps(cfg.to_dict(), sort_keys=True) for cfg in explainer_cfgs}):
+        payload += explainer_payload
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
-def get_dirs(data_cfg: DataConfig, oracle_cfg: OracleConfig, explainer_cfg: ExplainerConfig):
+def get_dirs(data_cfg: DataConfig, oracle_cfg: OracleConfig, *explainer_cfgs: ExplainerConfig):
     data_dir = Path("data")
     raw_data_dir = data_dir / "raw" / data_cfg.dataset_name
     processed_data_dir = (
         data_dir
         / "processed"
         / data_cfg.dataset_name
-        / config_hash(data_cfg, oracle_cfg, explainer_cfg)
+        / config_hash(data_cfg, oracle_cfg, *explainer_cfgs)
         / f"{data_cfg.random_seed}"
     )
     return raw_data_dir, processed_data_dir

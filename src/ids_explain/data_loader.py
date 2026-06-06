@@ -126,6 +126,13 @@ def _majority_target_for_total(y_train: np.ndarray, n_test: int, target_total_sa
     return target_total_samples - n_test - non_majority
 
 
+def _default_majority_target(y_train: np.ndarray) -> int:
+    _, counts = np.unique(y_train, return_counts=True)
+    majority_available = int(counts.max())
+    non_majority = int(counts.sum() - counts.max())
+    return min(2 * non_majority, majority_available)
+
+
 def load_dataset(data_cfg: DataConfig, raw_data_dir: Path) -> DatasetSplit:
     lf = _scan_csvs(raw_data_dir, data_cfg.csv_null_values)
     lf = _drop_duplicate_columns(lf)
@@ -139,9 +146,10 @@ def load_dataset(data_cfg: DataConfig, raw_data_dir: Path) -> DatasetSplit:
     X, y, feature_names = _to_numpy(df, data_cfg.label_column)
 
     X_train, X_test, y_train, y_test = _stratified_split(X, y, data_cfg.test_size, data_cfg.random_seed)
-    majority_target = None
     if data_cfg.target_total_samples is not None:
         majority_target = _majority_target_for_total(y_train, len(y_test), data_cfg.target_total_samples)
+    else:
+        majority_target = _default_majority_target(y_train)
     X_train, y_train = _undersample_majority(X_train, y_train, data_cfg.random_seed, majority_target)
 
     return DatasetSplit(

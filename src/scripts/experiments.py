@@ -121,7 +121,7 @@ def main(
         ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3),
     ]
 
-    experiment_hash = config_hash(base_cfg, oracle_cfg, explainers[0])
+    experiment_hash = config_hash(base_cfg, oracle_cfg, *explainers)
 
     runs: list[dict] = []
     oracle_reports: list[dict] = []
@@ -130,7 +130,7 @@ def main(
     for random_seed in range(n_seeds):
         print(f"\n=== seed {random_seed + 1}/{n_seeds} ===")
         data_cfg = replace(base_cfg, random_seed=random_seed)
-        raw_data_dir, processed_data_dir = get_dirs(data_cfg, oracle_cfg, explainers[0])
+        raw_data_dir, processed_data_dir = get_dirs(data_cfg, oracle_cfg, *explainers)
 
         data = _load_or_preprocess(data_cfg, raw_data_dir, processed_data_dir, save_processed_data=save_processed_data)
 
@@ -207,10 +207,13 @@ if __name__ == "__main__":
         action="store_true",
         help="Only train and evaluate the oracle; skip explainer training and evaluation.",
     )
-    parser.add_argument("--learning-rate", type=float, help="Learning rate used for training the oracle.")
+    parser.add_argument(
+        "--learning-rate", type=float, default=1e-3, help="Learning rate used for training the oracle."
+    )
     parser.add_argument(
         "--early-stopping-monitor",
         type=str,
+        default="val_loss",
         help="Metric to monitor when deciding whether to stop the oracle training early.",
         choices=["val_loss", "val_acc", "train_loss", "train_acc"],
     )

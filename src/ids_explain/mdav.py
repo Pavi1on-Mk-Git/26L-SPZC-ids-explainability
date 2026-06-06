@@ -75,9 +75,9 @@ def mdav(X: np.ndarray, k: int, progress: bool = False) -> list[np.ndarray]:
         X_remaining = np.setdiff1d(X_remaining, C_r, assume_unique=True)
         C.append(C_r)
         bar.update(len(C_r))
-    else:
-        C.append(X_remaining)
-        bar.update(len(X_remaining))
+
+    C.append(X_remaining)
+    bar.update(len(X_remaining))
 
     bar.set_postfix(clusters=len(C))
     bar.close()
