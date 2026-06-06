@@ -126,8 +126,8 @@ def _majority_target_for_total(y_train: np.ndarray, n_test: int, target_total_sa
     return target_total_samples - n_test - non_majority
 
 
-def load_dataset(data_cfg: DataConfig) -> DatasetSplit:
-    lf = _scan_csvs(data_cfg.raw_data_dir, data_cfg.csv_null_values)
+def load_dataset(data_cfg: DataConfig, raw_data_dir: Path) -> DatasetSplit:
+    lf = _scan_csvs(raw_data_dir, data_cfg.csv_null_values)
     lf = _drop_duplicate_columns(lf)
     lf = _strip_column_names(lf)
     lf = _replace_inf_with_null(lf)

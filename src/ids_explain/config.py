@@ -3,8 +3,6 @@ import json
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-CONFIG_FILE_NAME = "config.json"
-
 
 @dataclass
 class DataConfig:
@@ -18,37 +16,9 @@ class DataConfig:
     target_total_samples: int | None = None
     processed_data_name: str = "data.npz"
     processed_metadata_name: str = "metadata.json"
-    raw_data_dir: Path = field(init=False)
-    config_dir: Path = field(init=False)
-    processed_data_dir: Path = field(init=False)
-
-    def __post_init__(self):
-        data_dir = Path("data")
-        self.raw_data_dir = data_dir / "raw" / self.dataset_name
-        self.config_dir = data_dir / "processed" / self.dataset_name / self.config_hash()
-        self.processed_data_dir = self.config_dir / f"{self.random_seed}"
 
     def to_dict(self) -> dict:
         return {f.name: getattr(self, f.name) for f in fields(self) if f.init and f.name != "random_seed"}
-
-    def config_hash(self) -> str:
-        payload = json.dumps(self.to_dict(), sort_keys=True)
-        return hashlib.sha256(payload.encode()).hexdigest()[:16]
-
-    def write_or_verify_config(self) -> None:
-        self.config_dir.mkdir(parents=True, exist_ok=True)
-        config_path = self.config_dir / CONFIG_FILE_NAME
-        current = self.to_dict()
-        if config_path.exists():
-            existing = json.loads(config_path.read_text())
-            if existing != current:
-                raise ValueError(
-                    f"Config hash collision detected at {config_path}: the stored "
-                    f"config does not match the current config.\nstored:  {existing}\n"
-                    f"current: {current}"
-                )
-        else:
-            config_path.write_text(json.dumps(current, indent=4))
 
 
 @dataclass
@@ -65,6 +35,9 @@ class OracleConfig:
     best_ckpt_name: str = "best_ckpt"
     model_name: str = "oracle.pt"
 
+    def to_dict(self) -> dict:
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.init}
+
 
 @dataclass
 class ExplainerConfig:
@@ -78,6 +51,29 @@ class ExplainerConfig:
 
     def __post_init__(self):
         self.data_dir_name = f"explainer_k{self.k_frac}"
+
+    def to_dict(self) -> dict:
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.init and f.name != "k_frac"}
+
+
+def config_hash(data_cfg: DataConfig, oracle_cfg: OracleConfig, explainer_cfg: ExplainerConfig):
+    payload = json.dumps(data_cfg.to_dict(), sort_keys=True)
+    payload += json.dumps(oracle_cfg.to_dict(), sort_keys=True)
+    payload += json.dumps(explainer_cfg.to_dict(), sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def get_dirs(data_cfg: DataConfig, oracle_cfg: OracleConfig, explainer_cfg: ExplainerConfig):
+    data_dir = Path("data")
+    raw_data_dir = data_dir / "raw" / data_cfg.dataset_name
+    processed_data_dir = (
+        data_dir
+        / "processed"
+        / data_cfg.dataset_name
+        / config_hash(data_cfg, oracle_cfg, explainer_cfg)
+        / f"{data_cfg.random_seed}"
+    )
+    return raw_data_dir, processed_data_dir
 
 
 CICIDS2017_CONFIG = DataConfig(

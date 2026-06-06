@@ -46,20 +46,20 @@ def train_explainer(data: ProcessedData, data_cfg: DataConfig, explainer_cfg: Ex
     )
 
 
-def _explainer_dir(data_cfg: DataConfig, explainer_cfg: ExplainerConfig) -> Path:
-    return data_cfg.processed_data_dir / explainer_cfg.data_dir_name
+def _explainer_dir(explainer_cfg: ExplainerConfig, processed_data_dir: Path) -> Path:
+    return processed_data_dir / explainer_cfg.data_dir_name
 
 
-def save_explainer(explainer: Explainer, data_cfg: DataConfig, explainer_cfg: ExplainerConfig):
-    out_dir = _explainer_dir(data_cfg, explainer_cfg)
+def save_explainer(explainer: Explainer, explainer_cfg: ExplainerConfig, processed_data_dir: Path):
+    out_dir = _explainer_dir(explainer_cfg, processed_data_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / explainer_cfg.centroids_name, explainer.centroids)
     joblib.dump(explainer.trees, out_dir / explainer_cfg.trees_name)
     joblib.dump(explainer.cluster_indices, out_dir / explainer_cfg.cluster_indices_name)
 
 
-def load_explainer(data_cfg: DataConfig, explainer_cfg: ExplainerConfig) -> Explainer:
-    out_dir = _explainer_dir(data_cfg, explainer_cfg)
+def load_explainer(explainer_cfg: ExplainerConfig, processed_data_dir: Path) -> Explainer:
+    out_dir = _explainer_dir(explainer_cfg, processed_data_dir)
     return Explainer(
         centroids=np.load(out_dir / explainer_cfg.centroids_name),
         trees=joblib.load(out_dir / explainer_cfg.trees_name),

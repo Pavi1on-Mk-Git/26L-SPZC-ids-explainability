@@ -104,9 +104,7 @@ def _make_dataloader(
 
 
 def train_oracle(
-    data: ProcessedData,
-    data_cfg: DataConfig,
-    oracle_cfg: OracleConfig,
+    data: ProcessedData, data_cfg: DataConfig, oracle_cfg: OracleConfig, processed_data_dir: Path
 ) -> OracleMLP:
     seed_everything(data_cfg.random_seed)
 
@@ -143,7 +141,7 @@ def train_oracle(
         check_on_train_epoch_end=not use_validation,
     )
     checkpoint = ModelCheckpoint(
-        dirpath=data_cfg.processed_data_dir,
+        dirpath=processed_data_dir,
         filename=oracle_cfg.best_ckpt_name,
         monitor=monitor,
         mode=mode,
@@ -170,18 +168,15 @@ def train_oracle(
     return module.model
 
 
-def save_oracle(module: OracleMLP, data_cfg: DataConfig, oracle_cfg: OracleConfig) -> Path:
-    path = data_cfg.processed_data_dir / oracle_cfg.model_name
+def save_oracle(module: OracleMLP, oracle_cfg: OracleConfig, processed_data_dir: Path) -> Path:
+    path = processed_data_dir / oracle_cfg.model_name
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(module.state_dict(), path)
     return path
 
 
-def load_oracle(
-    data_cfg: DataConfig,
-    oracle_cfg: OracleConfig,
-) -> OracleMLP:
-    path = data_cfg.processed_data_dir / oracle_cfg.model_name
+def load_oracle(data_cfg: DataConfig, oracle_cfg: OracleConfig, processed_data_dir: Path) -> OracleMLP:
+    path = processed_data_dir / oracle_cfg.model_name
     module = OracleMLP(
         data_cfg.pca_components,
         oracle_cfg.hidden_dim,

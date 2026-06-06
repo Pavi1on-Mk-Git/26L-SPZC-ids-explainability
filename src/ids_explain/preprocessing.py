@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from sklearn.decomposition import PCA
@@ -40,11 +41,10 @@ def apply_pipeline(pipeline: Pipeline, X: np.ndarray) -> np.ndarray:
     return pipeline.transform(X).astype(np.float32)
 
 
-def save_processed(data: ProcessedData, config: DataConfig):
-    config.write_or_verify_config()
-    config.processed_data_dir.mkdir(parents=True, exist_ok=True)
+def save_processed(data: ProcessedData, config: DataConfig, processed_data_dir: Path):
+    processed_data_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
-        config.processed_data_dir / config.processed_data_name,
+        processed_data_dir / config.processed_data_name,
         X_train_raw=data.X_train_raw,
         X_train_pca=data.X_train_pca,
         X_test_raw=data.X_test_raw,
@@ -56,13 +56,12 @@ def save_processed(data: ProcessedData, config: DataConfig):
         "label_map": data.label_map,
         "feature_names": data.feature_names,
     }
-    (config.processed_data_dir / config.processed_metadata_name).write_text(json.dumps(metadata, indent=2))
+    (processed_data_dir / config.processed_metadata_name).write_text(json.dumps(metadata, indent=2))
 
 
-def load_processed(config: DataConfig) -> ProcessedData:
-    config.write_or_verify_config()
-    arrays = np.load(config.processed_data_dir / config.processed_data_name)
-    metadata = json.loads((config.processed_data_dir / config.processed_metadata_name).read_text())
+def load_processed(config: DataConfig, processed_data_dir: Path) -> ProcessedData:
+    arrays = np.load(processed_data_dir / config.processed_data_name)
+    metadata = json.loads((processed_data_dir / config.processed_metadata_name).read_text())
     return ProcessedData(
         X_train_raw=arrays["X_train_raw"],
         X_train_pca=arrays["X_train_pca"],
@@ -75,7 +74,7 @@ def load_processed(config: DataConfig) -> ProcessedData:
     )
 
 
-def preprocess(split: DatasetSplit, config: DataConfig, save: bool = True) -> ProcessedData:
+def preprocess(split: DatasetSplit, config: DataConfig, processed_data_dir: Path, save: bool = True) -> ProcessedData:
     pipeline = build_preprocessing_pipeline(config.pca_components, config.random_seed)
     X_train_pca = fit_pipeline(pipeline, split.X_train)
     X_test_pca = apply_pipeline(pipeline, split.X_test)
@@ -91,5 +90,5 @@ def preprocess(split: DatasetSplit, config: DataConfig, save: bool = True) -> Pr
         feature_names=split.feature_names,
     )
     if save:
-        save_processed(data, config)
+        save_processed(data, config, processed_data_dir)
     return data

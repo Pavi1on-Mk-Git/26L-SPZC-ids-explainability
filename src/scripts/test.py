@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ids_explain.config import CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG, DEFAULT_ORACLE_CONFIG
+from ids_explain.config import CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG, DEFAULT_ORACLE_CONFIG, get_dirs
 from ids_explain.data_loader import load_dataset
 from ids_explain.explainer import Explainer, load_explainer, predict_explainer, save_explainer, train_explainer
 from ids_explain.oracle import OracleMLP, load_oracle, predict, save_oracle, train_oracle
@@ -35,24 +35,27 @@ def test(processed: ProcessedData, oracle: OracleMLP, explainer: Explainer):
 
 
 def full_main():
-    dataset = load_dataset(CICIDS2017_CONFIG)
-    processed = preprocess(dataset, CICIDS2017_CONFIG)
+    raw_data_dir, processed_data_dir = get_dirs(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, DEFAULT_EXPLAINER_CONFIG)
 
-    oracle = train_oracle(processed, CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG)
+    dataset = load_dataset(CICIDS2017_CONFIG, raw_data_dir)
+    processed = preprocess(dataset, CICIDS2017_CONFIG, processed_data_dir)
 
-    save_oracle(oracle, CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG)
+    oracle = train_oracle(processed, CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, processed_data_dir)
+
+    save_oracle(oracle, DEFAULT_ORACLE_CONFIG, processed_data_dir)
 
     explainer = train_explainer(processed, CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG)
 
-    save_explainer(explainer, CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG)
+    save_explainer(explainer, DEFAULT_EXPLAINER_CONFIG, processed_data_dir)
 
     test(processed, oracle, explainer)
 
 
 def loaded_main():
-    processed = load_processed(CICIDS2017_CONFIG)
-    oracle = load_oracle(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG)
-    explainer = load_explainer(CICIDS2017_CONFIG, DEFAULT_EXPLAINER_CONFIG)
+    raw_data_dir, processed_data_dir = get_dirs(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, DEFAULT_EXPLAINER_CONFIG)
+    processed = load_processed(CICIDS2017_CONFIG, processed_data_dir)
+    oracle = load_oracle(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, processed_data_dir)
+    explainer = load_explainer(DEFAULT_EXPLAINER_CONFIG, processed_data_dir)
     test(processed, oracle, explainer)
 
 

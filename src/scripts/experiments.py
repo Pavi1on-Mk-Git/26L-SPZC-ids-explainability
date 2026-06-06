@@ -6,12 +6,7 @@ from pathlib import Path
 import numpy as np
 from sklearn.metrics import classification_report
 
-from ids_explain.config import (
-    CICIDS2017_CONFIG,
-    DataConfig,
-    ExplainerConfig,
-    OracleConfig,
-)
+from ids_explain.config import CICIDS2017_CONFIG, DataConfig, ExplainerConfig, OracleConfig, config_hash, get_dirs
 from ids_explain.data_loader import load_dataset
 from ids_explain.explainer import (
     Explainer,
@@ -28,28 +23,34 @@ REPORT_NAME = "report.json"
 ORACLE_REPORT_NAME = "results_oracle.json"
 
 
-def _load_or_preprocess(data_cfg: DataConfig, save_processed_data: bool = True) -> ProcessedData:
-    processed_path = data_cfg.processed_data_dir / data_cfg.processed_data_name
+def _load_or_preprocess(
+    data_cfg: DataConfig,
+    raw_data_dir: Path,
+    processed_data_dir: Path,
+    save_processed_data: bool = True,
+) -> ProcessedData:
+    processed_path = processed_data_dir / data_cfg.processed_data_name
     if processed_path.exists():
         print("[data] loading preprocessed data from disk")
-        return load_processed(data_cfg)
+        return load_processed(data_cfg, processed_data_dir)
     print(f"[data] preprocessing raw CSVs ({'caching to disk' if save_processed_data else 'in-memory'})")
-    split = load_dataset(data_cfg)
-    return preprocess(split, data_cfg, save=save_processed_data)
+    split = load_dataset(data_cfg, raw_data_dir)
+    return preprocess(split, data_cfg, processed_data_dir, save=save_processed_data)
 
 
 def _load_or_train_oracle(
     data: ProcessedData,
     data_cfg: DataConfig,
     oracle_cfg: OracleConfig,
+    processed_data_dir: Path,
 ) -> OracleMLP:
-    oracle_path = data_cfg.processed_data_dir / oracle_cfg.model_name
+    oracle_path = processed_data_dir / oracle_cfg.model_name
     if oracle_path.exists():
         print("[oracle] loading trained oracle from disk")
-        return load_oracle(data_cfg, oracle_cfg)
+        return load_oracle(data_cfg, oracle_cfg, processed_data_dir)
     print("[oracle] training from scratch")
-    mlp = train_oracle(data, data_cfg, oracle_cfg)
-    save_oracle(mlp, data_cfg, oracle_cfg)
+    mlp = train_oracle(data, data_cfg, oracle_cfg, processed_data_dir)
+    save_oracle(mlp, oracle_cfg, processed_data_dir)
     return mlp
 
 
@@ -57,14 +58,15 @@ def _load_or_train_explainer(
     data: ProcessedData,
     data_cfg: DataConfig,
     explainer_cfg: ExplainerConfig,
+    processed_data_dir: Path,
 ) -> Explainer:
-    explainer_dir = data_cfg.processed_data_dir / explainer_cfg.data_dir_name
+    explainer_dir = processed_data_dir / explainer_cfg.data_dir_name
     if explainer_dir.exists():
         print(f"[explainer k_frac={explainer_cfg.k_frac}] loading from disk")
-        return load_explainer(data_cfg, explainer_cfg)
+        return load_explainer(explainer_cfg, processed_data_dir)
     print(f"[explainer k_frac={explainer_cfg.k_frac}] training from scratch")
     explainer = train_explainer(data, data_cfg, explainer_cfg)
-    save_explainer(explainer, data_cfg, explainer_cfg)
+    save_explainer(explainer, explainer_cfg, processed_data_dir)
     return explainer
 
 
@@ -114,10 +116,12 @@ def main(
         early_stopping_patience=5,
         early_stopping_monitor=early_stopping_monitor,
     )
-    explainer_specs = {
-        "k=0.2": ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3),
-        "k=0.005": ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3),
-    }
+    explainers = [
+        ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3),
+        ExplainerConfig(k_frac=0.005, tree_max_depth=4, n_search=3),
+    ]
+
+    experiment_hash = config_hash(base_cfg, oracle_cfg, explainers[0])
 
     runs: list[dict] = []
     oracle_reports: list[dict] = []
@@ -126,9 +130,11 @@ def main(
     for random_seed in range(n_seeds):
         print(f"\n=== seed {random_seed + 1}/{n_seeds} ===")
         data_cfg = replace(base_cfg, random_seed=random_seed)
-        data = _load_or_preprocess(data_cfg, save_processed_data=save_processed_data)
+        raw_data_dir, processed_data_dir = get_dirs(data_cfg, oracle_cfg, explainers[0])
 
-        mlp = _load_or_train_oracle(data, data_cfg, oracle_cfg)
+        data = _load_or_preprocess(data_cfg, raw_data_dir, processed_data_dir, save_processed_data=save_processed_data)
+
+        mlp = _load_or_train_oracle(data, data_cfg, oracle_cfg, processed_data_dir)
         oracle_preds = predict(mlp, data.X_test_pca, batch_size=oracle_cfg.batch_size)
         oracle_report = _report(data.y_test, oracle_preds, data.label_map)
         oracle_reports.append(oracle_report)
@@ -147,8 +153,9 @@ def main(
 
         if include_explainers:
             run["explainers"] = {}
-            for key, explainer_cfg in explainer_specs.items():
-                explainer = _load_or_train_explainer(data, data_cfg, explainer_cfg)
+            for explainer_cfg in explainers:
+                key = f"k={explainer_cfg.k_frac}"
+                explainer = _load_or_train_explainer(data, data_cfg, explainer_cfg, processed_data_dir)
                 explainer_preds = predict_explainer(
                     explainer, data.X_test_raw, oracle_preds, n_search=explainer_cfg.n_search
                 )
@@ -167,18 +174,20 @@ def main(
     config_block: dict = {"data": base_cfg.to_dict(), "oracle": asdict(oracle_cfg)}
     aggregate: dict = {"oracle": _aggregate(oracle_reports)}
     if include_explainers:
-        config_block["explainers"] = {key: asdict(explainer_cfg) for key, explainer_cfg in explainer_specs.items()}
+        config_block["explainers"] = {
+            f"k={explainer_cfg.k_frac}": asdict(explainer_cfg) for explainer_cfg in explainers
+        }
         aggregate["explainers"] = {key: _aggregate(reports) for key, reports in explainer_reports.items()}
 
     report = {
-        "config_hash": base_cfg.config_hash(),
+        "config_hash": experiment_hash,
         "seeds": list(range(n_seeds)),
         "config": config_block,
         "runs": runs,
         "aggregate": aggregate,
     }
 
-    results_dir = RESULTS_DIR / base_cfg.config_hash()
+    results_dir = RESULTS_DIR / experiment_hash
     results_dir.mkdir(parents=True, exist_ok=True)
     report_name = REPORT_NAME if include_explainers else ORACLE_REPORT_NAME
     out_path = results_dir / report_name
