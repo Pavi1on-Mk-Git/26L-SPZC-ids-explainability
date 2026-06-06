@@ -60,8 +60,11 @@ class OracleModule(LightningModule):
         return self.loss_fn(logits, y), logits
 
     def training_step(self, batch: tuple[Tensor, Tensor], _: int) -> Tensor:
-        loss, _ = self._shared_step(batch)
+        loss, logits = self._shared_step(batch)
+        preds = logits.argmax(dim=1)
+        acc = (preds == batch[1]).float().mean()
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
         return loss
 
     def validation_step(self, batch: tuple[Tensor, Tensor], _: int):
