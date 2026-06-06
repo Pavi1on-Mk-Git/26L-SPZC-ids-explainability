@@ -95,19 +95,24 @@ def _aggregate(reports: list[dict]) -> dict:
     return aggregate
 
 
-def main(save_processed_data: bool = True, include_explainers: bool = True):
+def main(
+    save_processed_data: bool = True,
+    include_explainers: bool = True,
+    learning_rate: float = 1e-3,
+    early_stopping_monitor: str = "val_loss",
+):
     n_seeds = 5
     base_cfg = CICIDS2017_CONFIG
     oracle_cfg = OracleConfig(
         hidden_dim=512,
         n_layers=5,
         dropout=0.2,
-        learning_rate=1e-3,
+        learning_rate=learning_rate,
         batch_size=10_000,
         max_epochs=100,
         val_size=0.25,
         early_stopping_patience=5,
-        early_stopping_monitor="val_loss",
+        early_stopping_monitor=early_stopping_monitor,
     )
     explainer_specs = {
         "k=0.2": ExplainerConfig(k_frac=0.2, tree_max_depth=4, n_search=3),
@@ -193,5 +198,17 @@ if __name__ == "__main__":
         action="store_true",
         help="Only train and evaluate the oracle; skip explainer training and evaluation.",
     )
+    parser.add_argument("--learning-rate", type=float, help="Learning rate used for training the oracle.")
+    parser.add_argument(
+        "--early-stopping-monitor",
+        type=str,
+        help="Metric to monitor when deciding whether to stop the oracle training early.",
+        choices=["val_loss", "val_acc", "train_loss", "train_acc"],
+    )
     args = parser.parse_args()
-    main(save_processed_data=not args.no_save_processed, include_explainers=not args.oracle_only)
+    main(
+        save_processed_data=not args.no_save_processed,
+        include_explainers=not args.oracle_only,
+        learning_rate=args.learning_rate,
+        early_stopping_monitor=args.early_stopping_monitor,
+    )
