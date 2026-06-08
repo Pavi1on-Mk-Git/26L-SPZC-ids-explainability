@@ -1,10 +1,3 @@
-"""Collect oracle results across experiments and print a LaTeX table to stdout.
-
-Scans the ``results/`` directory for the JSON reports written by
-``experiments.py`` (``report.json`` or ``results_oracle.json``) and emits one
-table row per learning rate with accuracy and macro-F1 as ``avg +- stdev``.
-"""
-
 import json
 from pathlib import Path
 
@@ -37,7 +30,6 @@ def collect_rows() -> list[tuple[float, dict, dict]]:
 
 
 def num(text: str) -> str:
-    """Wrap a formatted number in math mode using ``{,}`` as decimal separator."""
     return f"${text.replace('.', '{,}')}$"
 
 

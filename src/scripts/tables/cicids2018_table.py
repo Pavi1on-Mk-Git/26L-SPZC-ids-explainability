@@ -1,15 +1,3 @@
-"""Print a LaTeX table of per-class precision/recall on CSE-CIC-IDS-2018.
-
-Analogous to ``comparison_table.py`` but for the CSE-CIC-IDS-2018 dataset, which
-the paper does not report, so there are no "original" columns -- only our own
-results read from the JSON reports written by ``experiments.py``
-(``report.json``) as ``avg +- stdev`` over seeds.
-
-Usage::
-
-    python src/scripts/cicids2018_table.py [oracle | k=0.2 | k=0.005]
-"""
-
 import argparse
 import json
 from pathlib import Path
@@ -25,7 +13,6 @@ METRIC_KEYS = ("accuracy", "macro avg", "weighted avg")
 
 
 def find_aggregate(model: str) -> dict:
-    """Return the per-class aggregate for ``model`` on the CSE-CIC-IDS-2018 set."""
     for report_dir in sorted(RESULTS_DIR.iterdir()):
         path = report_dir / REPORT_NAME
         if not path.exists():
@@ -46,7 +33,6 @@ def find_aggregate(model: str) -> dict:
 
 
 def fmt(stat: dict) -> str:
-    """Format a ``{mean, std}`` aggregate as ``$mean \\pm std$``."""
     return f"${stat['mean']:.3f} \\pm {stat['std']:.3f}$".replace(".", "{,}")
 
 
@@ -62,9 +48,7 @@ def main(model: str) -> None:
     for cls, stat in ours.items():
         if cls in METRIC_KEYS:
             continue
-        lines.append(
-            f"{cls.replace('_', r'\\_')} & {fmt(stat['precision'])} & {fmt(stat['recall'])} \\\\"
-        )
+        lines.append(f"{cls.replace('_', r'\\_')} & {fmt(stat['precision'])} & {fmt(stat['recall'])} \\\\")
         lines.append(r"\hline")
     lines.append(r"\end{tabular}")
 

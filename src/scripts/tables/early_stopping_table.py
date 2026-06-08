@@ -1,12 +1,3 @@
-"""Collect oracle results across early-stopping variants and print a LaTeX table.
-
-Scans the ``results/`` directory for the JSON reports written by
-``experiments.py`` (``report.json`` or ``results_oracle.json``) and emits one
-table row per early-stopping monitor with accuracy and macro-F1 as
-``avg +- stdev``. Only runs at the default learning rate are considered, so the
-learning-rate sweep does not leak into this table.
-"""
-
 import json
 from pathlib import Path
 

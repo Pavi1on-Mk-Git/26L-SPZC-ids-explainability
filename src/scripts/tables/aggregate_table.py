@@ -1,23 +1,3 @@
-"""Print a LaTeX table of overall accuracy and macro-F1 for a chosen model.
-
-Three rows are emitted:
-
-    CIC IDS 2017 (oryginał) -- the paper's reported accuracy, with macro-F1
-        computed from the per-class precision/recall of its tables.
-    CIC IDS 2017 (nasz)     -- our results on CICIDS2017.
-    CSE-CIC-IDS 2018 (nasz) -- our results on CSE-CIC-IDS-2018.
-
-The model can be the oracle (Table I / Table II oracle accuracy) or one of the
-explainers (Tables III/IV, with the explainer accuracy from Table II). Our rows
-are read from the ``report.json`` files written by ``experiments.py`` as
-``avg +- stdev`` over seeds, at the default learning rate with ``val_acc`` early
-stopping.
-
-Usage::
-
-    python src/scripts/aggregate_table.py [oracle | k=0.2 | k=0.005]
-"""
-
 import argparse
 import json
 from pathlib import Path
@@ -27,10 +7,8 @@ REPORT_NAME = "report.json"
 DEFAULT_LR = 1e-3
 MONITOR = "val_acc"
 
-# Per-class (precision, recall) as percentages, straight from the paper tables,
-# and the overall accuracy the paper reports for each model (Tables I-IV).
 PAPER = {
-    "oracle": {  # Table I, accuracy from Table II
+    "oracle": {
         "accuracy": 0.98,
         "classes": {
             "Benign": (99, 98),
@@ -44,7 +22,7 @@ PAPER = {
             "SSH-Patator": (100, 51),
         },
     },
-    "k=0.2": {  # Table III, accuracy from Table II
+    "k=0.2": {
         "accuracy": 0.95,
         "classes": {
             "Benign": (98, 98),
@@ -58,7 +36,7 @@ PAPER = {
             "SSH-Patator": (0, 0),
         },
     },
-    "k=0.005": {  # Table IV, accuracy from Table II
+    "k=0.005": {
         "accuracy": 0.99,
         "classes": {
             "Benign": (99, 99),
@@ -82,11 +60,6 @@ def paper_macro_f1(model: str) -> float:
 
 
 def find_aggregate(dataset_name: str, model: str) -> dict:
-    """Return the ``model`` aggregate for ``dataset_name`` from the final report.
-
-    Only the ``report.json`` runs at the default learning rate with ``val_acc``
-    early stopping are considered.
-    """
     for report_dir in sorted(RESULTS_DIR.iterdir()):
         path = report_dir / REPORT_NAME
         if not path.exists():
@@ -107,12 +80,10 @@ def find_aggregate(dataset_name: str, model: str) -> dict:
 
 
 def num(value: float) -> str:
-    """Format a 0..1 value as ``$0{,}xx$`` (comma decimal separator)."""
     return f"${value:.2f}$".replace(".", "{,}")
 
 
 def fmt(stat: dict) -> str:
-    """Format a ``{mean, std}`` aggregate as ``$mean \\pm std$``."""
     return f"${stat['mean']:.2f} \\pm {stat['std']:.2f}$".replace(".", "{,}")
 
 

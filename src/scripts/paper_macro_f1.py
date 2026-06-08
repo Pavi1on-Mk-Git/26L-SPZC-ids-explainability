@@ -1,18 +1,3 @@
-"""Compute macro-F1 from the precision/recall values reported in the paper.
-
-The per-class precision and recall are hardcoded from the tables in
-"Achieving Explainability of Intrusion Detection System by Hybrid
-Oracle-Explainer Approach" (Szczepanski et al., 2020):
-
-    Table I   -> Oracle (ANN + PCA)
-    Table III -> Explainer, k=0.2
-    Table IV  -> Explainer, k=0.005
-
-For each class F1 = 2*p*r / (p+r) (0 when p+r == 0), and macro-F1 is the
-unweighted mean of the per-class F1 scores.
-"""
-
-# class -> (precision, recall), as percentages straight from the tables.
 TABLES = {
     "Oracle (Table I)": {
         "Benign": (99, 98),

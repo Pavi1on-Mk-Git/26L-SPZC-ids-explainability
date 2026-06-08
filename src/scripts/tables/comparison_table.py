@@ -1,23 +1,3 @@
-"""Print a LaTeX table comparing per-class precision/recall: paper vs ours.
-
-The "original" columns hold the per-class precision and recall reported in
-"Achieving Explainability of Intrusion Detection System by Hybrid
-Oracle-Explainer Approach" (Szczepanski et al., 2020):
-
-    Table I   -> oracle (ANN + PCA)
-    Table III -> explainer, k=0.2
-    Table IV  -> explainer, k=0.005
-
-The "ours" columns are read from the JSON reports written by ``experiments.py``
-(``report.json``) as ``avg +- stdev`` over seeds.
-Only runs at the default learning rate and ``val_loss`` early stopping are used,
-so the learning-rate / early-stopping sweeps do not leak in.
-
-Usage::
-
-    python src/scripts/comparison_table.py [oracle | k=0.2 | k=0.005]
-"""
-
 import argparse
 import json
 from pathlib import Path
@@ -27,9 +7,8 @@ REPORT_NAME = "report.json"
 DEFAULT_LR = 1e-3
 MONITOR = "val_acc"
 
-# Per-class (precision, recall) as percentages, straight from the paper tables.
 PAPER = {
-    "oracle": {  # Table I
+    "oracle": {
         "Benign": (99, 98),
         "DDoS": (100, 98),
         "DoS GoldenEye": (96, 99),
@@ -40,7 +19,7 @@ PAPER = {
         "PortScan": (88, 97),
         "SSH-Patator": (100, 51),
     },
-    "k=0.2": {  # Table III
+    "k=0.2": {
         "Benign": (98, 98),
         "DDoS": (82, 76),
         "DoS GoldenEye": (53, 19),
@@ -51,7 +30,7 @@ PAPER = {
         "PortScan": (99, 99),
         "SSH-Patator": (0, 0),
     },
-    "k=0.005": {  # Table IV
+    "k=0.005": {
         "Benign": (99, 99),
         "DDoS": (99, 99),
         "DoS GoldenEye": (93, 87),
@@ -66,12 +45,6 @@ PAPER = {
 
 
 def find_aggregate(model: str, classes: set[str]) -> dict:
-    """Return the per-class aggregate for ``model`` from the matching report.
-
-    Only the final ``report.json`` runs at the default learning rate with
-    ``val_acc`` early stopping whose classes match the paper's (i.e. the
-    CICIDS2017 dataset, not e.g. CSE-CIC-IDS-2018) are considered.
-    """
     for report_dir in sorted(RESULTS_DIR.iterdir()):
         path = report_dir / REPORT_NAME
         if not path.exists():
@@ -90,19 +63,16 @@ def find_aggregate(model: str, classes: set[str]) -> dict:
 
 
 def num(value: float) -> str:
-    """Format a 0..1 value as ``$0{,}xx$`` (comma decimal separator)."""
     return f"${value:.2f}$".replace(".", "{,}")
 
 
 def fmt(stat: dict) -> str:
-    """Format a ``{mean, std}`` aggregate as ``$mean \\pm std$``."""
     return f"${stat['mean']:.2f} \\pm {stat['std']:.2f}$".replace(".", "{,}")
 
 
 def main(model: str) -> None:
     paper = PAPER[model]
     ours = find_aggregate(model, {cls.lower() for cls in paper})
-    # Match our (possibly differently-cased) class names to the paper ones.
     ours_by_lower = {k.lower(): v for k, v in ours.items()}
 
     lines = [
