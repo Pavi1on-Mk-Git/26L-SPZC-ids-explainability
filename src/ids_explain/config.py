@@ -13,6 +13,8 @@ class DataConfig:
     pca_components: int
     test_size: float
     random_seed: int
+    columns_to_drop: list[str] = field(default_factory=list)
+    csv_filenames: list[str] | None = None
     target_total_samples: int | None = None
     processed_data_name: str = "data.npz"
     processed_metadata_name: str = "metadata.json"
@@ -97,6 +99,41 @@ CICIDS2017_CONFIG = DataConfig(
     random_seed=42,
     target_total_samples=1_971_937,
 )
+
+CSE_CIC_IDS_2018_CONFIG = DataConfig(
+    dataset_name="CSE-CIC-IDS-2018",
+    label_column="Label",
+    classes_to_keep=[
+        "Benign",
+        "Bot",
+        "DDOS attack-HOIC",
+        "DDOS attack-LOIC-UDP",
+        "DDoS attacks-LOIC-HTTP",
+        "DoS attacks-GoldenEye",
+        "DoS attacks-Hulk",
+        "DoS attacks-SlowHTTPTest",
+        "DoS attacks-Slowloris",
+        "FTP-BruteForce",
+        "Infilteration",
+        "SSH-Bruteforce",
+    ],
+    csv_null_values=["Infinity", "NaN"],
+    columns_to_drop=["Timestamp", "Flow ID", "Src IP", "Src Port", "Dst IP"],
+    csv_filenames=[
+        "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
+        "Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv",
+        "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+    ],
+    pca_components=35,
+    test_size=0.25,
+    random_seed=42,
+    target_total_samples=None,
+)
+
+DATASET_CONFIGS: dict[str, DataConfig] = {
+    CICIDS2017_CONFIG.dataset_name: CICIDS2017_CONFIG,
+    CSE_CIC_IDS_2018_CONFIG.dataset_name: CSE_CIC_IDS_2018_CONFIG,
+}
 
 DEFAULT_ORACLE_CONFIG = OracleConfig(
     hidden_dim=512,

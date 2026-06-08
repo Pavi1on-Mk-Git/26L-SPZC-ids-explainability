@@ -19,9 +19,15 @@ class DatasetSplit:
     feature_names: list[str]
 
 
-def _scan_csvs(data_dir: Path, null_values: list[str]) -> pl.LazyFrame:
-    files = sorted(data_dir.glob("*.csv"))
-    frames = [pl.scan_csv(f, null_values=null_values, try_parse_dates=False, infer_schema_length=10_000) for f in files]
+def _scan_csvs(data_dir: Path, null_values: list[str], filenames: list[str] | None = None) -> pl.LazyFrame:
+    if filenames:
+        files = [data_dir / name for name in filenames]
+        missing = [str(f) for f in files if not f.exists()]
+        if missing:
+            raise FileNotFoundError(f"Configured CSV files not found: {missing}")
+    else:
+        files = sorted(data_dir.glob("*.csv"))
+    frames = [pl.scan_csv(f, null_values=null_values, try_parse_dates=False, infer_schema_length=None) for f in files]
     return pl.concat(frames, how="diagonal_relaxed")
 
 
@@ -34,6 +40,16 @@ def _strip_column_names(lf: pl.LazyFrame) -> pl.LazyFrame:
 def _drop_duplicate_columns(lf: pl.LazyFrame) -> pl.LazyFrame:
     duplicate_cols = [name for name in lf.collect_schema().names() if "_duplicated_" in name]
     return lf.drop(duplicate_cols) if duplicate_cols else lf
+
+
+def _drop_columns(lf: pl.LazyFrame, columns: list[str]) -> pl.LazyFrame:
+    present = set(lf.collect_schema().names())
+    to_drop = [c for c in columns if c in present]
+    return lf.drop(to_drop) if to_drop else lf
+
+
+def _normalize_label(lf: pl.LazyFrame, label_column: str) -> pl.LazyFrame:
+    return lf.with_columns(pl.col(label_column).cast(pl.String).str.strip_chars())
 
 
 def _replace_inf_with_null(lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -55,30 +71,28 @@ def _filter_classes(
     return lf.filter(pl.col(label_column).is_in(classes))
 
 
-def _encode_labels(
-    df: pl.DataFrame,
+def _collect_xy(
+    lf: pl.LazyFrame,
     label_column: str,
-) -> tuple[pl.DataFrame, dict[str, int]]:
+) -> tuple[np.ndarray, np.ndarray, dict[str, int], list[str]]:
+    feature_names = [name for name in lf.collect_schema().names() if name != label_column]
+    lf = lf.with_columns(pl.col(c).cast(pl.Float32) for c in feature_names)
+    df = lf.collect(engine="streaming")
+
     unique_labels: list[str] = sorted(df[label_column].unique().to_list())
     label_map = {label: idx for idx, label in enumerate(unique_labels)}
-    encoded = df.with_columns(
-        pl.col(label_column).replace_strict(
+    y = (
+        df[label_column]
+        .replace_strict(
             old=pl.Series(list(label_map.keys())),
             new=pl.Series(list(label_map.values()), dtype=pl.Int64),
             return_dtype=pl.Int64,
         )
+        .to_numpy()
     )
-    return encoded, label_map
 
-
-def _to_numpy(
-    df: pl.DataFrame,
-    label_col: str,
-) -> tuple[np.ndarray, np.ndarray, list[str]]:
-    feature_cols = [c for c in df.columns if c != label_col]
-    X = df.select(pl.col(c).cast(pl.Float32) for c in feature_cols).to_numpy(allow_copy=True).astype(np.float32)
-    y = df[label_col].cast(pl.Int64).to_numpy().astype(np.int64)
-    return X, y, feature_cols
+    X = df.drop(label_column).to_numpy()
+    return X, y, label_map, feature_names
 
 
 def _stratified_split(
@@ -134,18 +148,19 @@ def _default_majority_target(y_train: np.ndarray) -> int:
 
 
 def load_dataset(data_cfg: DataConfig, raw_data_dir: Path) -> DatasetSplit:
-    lf = _scan_csvs(raw_data_dir, data_cfg.csv_null_values)
+    lf = _scan_csvs(raw_data_dir, data_cfg.csv_null_values, data_cfg.csv_filenames)
     lf = _drop_duplicate_columns(lf)
     lf = _strip_column_names(lf)
+    lf = _drop_columns(lf, data_cfg.columns_to_drop)
     lf = _replace_inf_with_null(lf)
+    lf = _normalize_label(lf, data_cfg.label_column)
     lf = _filter_classes(lf, data_cfg.label_column, data_cfg.classes_to_keep)
     lf = lf.drop_nulls()
 
-    df = lf.collect()
-    df, label_map = _encode_labels(df, data_cfg.label_column)
-    X, y, feature_names = _to_numpy(df, data_cfg.label_column)
+    X, y, label_map, feature_names = _collect_xy(lf, data_cfg.label_column)
 
     X_train, X_test, y_train, y_test = _stratified_split(X, y, data_cfg.test_size, data_cfg.random_seed)
+    del X, y
     if data_cfg.target_total_samples is not None:
         majority_target = _majority_target_for_total(y_train, len(y_test), data_cfg.target_total_samples)
     else:

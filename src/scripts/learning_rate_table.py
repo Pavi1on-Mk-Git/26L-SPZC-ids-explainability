@@ -36,22 +36,27 @@ def collect_rows() -> list[tuple[float, dict, dict]]:
     return rows
 
 
+def num(text: str) -> str:
+    """Wrap a formatted number in math mode using ``{,}`` as decimal separator."""
+    return f"${text.replace('.', '{,}')}$"
+
+
 def fmt(stat: dict) -> str:
-    return f"{stat['mean']:.3f} $\\pm$ {stat['std']:.3f}"
+    return f"${stat['mean']:.3f} \\pm {stat['std']:.3f}$".replace(".", "{,}")
 
 
 def main() -> None:
     rows = collect_rows()
 
     lines = [
-        r"\begin{tabular}{ccc}",
+        r"\begin{tabular}{|c|c|c|}",
         r"\hline",
         r"learning rate & accuracy & macro-F1 \\",
         r"\hline",
     ]
     for lr, acc, f1 in rows:
-        lines.append(f"{lr:g} & {fmt(acc)} & {fmt(f1)} \\\\")
-    lines.append(r"\hline")
+        lines.append(f"{num(f'{lr:g}')} & {fmt(acc)} & {fmt(f1)} \\\\")
+        lines.append(r"\hline")
     lines.append(r"\end{tabular}")
 
     print("\n".join(lines))

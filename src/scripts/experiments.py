@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from sklearn.metrics import classification_report
 
-from ids_explain.config import CICIDS2017_CONFIG, DataConfig, ExplainerConfig, OracleConfig, config_hash, get_dirs
+from ids_explain.config import DATASET_CONFIGS, DataConfig, ExplainerConfig, OracleConfig, config_hash, get_dirs
 from ids_explain.data_loader import load_dataset
 from ids_explain.explainer import (
     Explainer,
@@ -98,13 +98,14 @@ def _aggregate(reports: list[dict]) -> dict:
 
 
 def main(
+    dataset: str = "CICIDS2017",
     save_processed_data: bool = True,
     include_explainers: bool = True,
     learning_rate: float = 1e-3,
     early_stopping_monitor: str = "val_loss",
 ):
     n_seeds = 5
-    base_cfg = CICIDS2017_CONFIG
+    base_cfg = DATASET_CONFIGS[dataset]
     oracle_cfg = OracleConfig(
         hidden_dim=512,
         n_layers=5,
@@ -198,6 +199,13 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the oracle/explainer reproduction experiments.")
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="CICIDS2017",
+        choices=sorted(DATASET_CONFIGS),
+        help="Which dataset configuration to run the experiments on.",
+    )
+    parser.add_argument(
         "--no-save-processed",
         action="store_true",
         help="Do not write the processed dataset to disk; preprocess in-memory each run instead.",
@@ -219,6 +227,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     main(
+        dataset=args.dataset,
         save_processed_data=not args.no_save_processed,
         include_explainers=not args.oracle_only,
         learning_rate=args.learning_rate,

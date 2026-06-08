@@ -40,21 +40,21 @@ def collect_rows() -> list[tuple[str, dict, dict]]:
 
 
 def fmt(stat: dict) -> str:
-    return f"{stat['mean']:.3f} $\\pm$ {stat['std']:.3f}"
+    return f"${stat['mean']:.3f} \\pm {stat['std']:.3f}$".replace(".", "{,}")
 
 
 def main() -> None:
     rows = collect_rows()
 
     lines = [
-        r"\begin{tabular}{ccc}",
+        r"\begin{tabular}{|c|c|c|}",
         r"\hline",
         r"early stopping & accuracy & macro-F1 \\",
         r"\hline",
     ]
     for monitor, acc, f1 in rows:
         lines.append(f"{monitor.replace('_', r'\_')} & {fmt(acc)} & {fmt(f1)} \\\\")
-    lines.append(r"\hline")
+        lines.append(r"\hline")
     lines.append(r"\end{tabular}")
 
     print("\n".join(lines))
