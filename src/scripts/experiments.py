@@ -47,7 +47,7 @@ def _load_or_train_oracle(
     oracle_path = processed_data_dir / oracle_cfg.model_name
     if oracle_path.exists():
         print("[oracle] loading trained oracle from disk")
-        return load_oracle(data_cfg, oracle_cfg, processed_data_dir)
+        return load_oracle(data_cfg, oracle_cfg, processed_data_dir, len(data.label_map))
     print("[oracle] training from scratch")
     mlp = train_oracle(data, data_cfg, oracle_cfg, processed_data_dir)
     save_oracle(mlp, oracle_cfg, processed_data_dir)

@@ -175,13 +175,18 @@ def save_oracle(module: OracleMLP, oracle_cfg: OracleConfig, processed_data_dir:
     return path
 
 
-def load_oracle(data_cfg: DataConfig, oracle_cfg: OracleConfig, processed_data_dir: Path) -> OracleMLP:
+def load_oracle(
+    data_cfg: DataConfig, oracle_cfg: OracleConfig, processed_data_dir: Path, n_classes: int
+) -> OracleMLP:
     path = processed_data_dir / oracle_cfg.model_name
+    # n_classes must match what train_oracle used (the classes actually present
+    # in the data), not len(classes_to_keep): a configured class may be absent
+    # from the loaded files, giving a smaller output head than the config list.
     module = OracleMLP(
         data_cfg.pca_components,
         oracle_cfg.hidden_dim,
         oracle_cfg.n_layers,
-        len(data_cfg.classes_to_keep),
+        n_classes,
         oracle_cfg.dropout,
     )
     module.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))

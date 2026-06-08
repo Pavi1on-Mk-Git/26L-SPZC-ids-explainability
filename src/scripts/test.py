@@ -54,7 +54,7 @@ def full_main():
 def loaded_main():
     raw_data_dir, processed_data_dir = get_dirs(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, DEFAULT_EXPLAINER_CONFIG)
     processed = load_processed(CICIDS2017_CONFIG, processed_data_dir)
-    oracle = load_oracle(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, processed_data_dir)
+    oracle = load_oracle(CICIDS2017_CONFIG, DEFAULT_ORACLE_CONFIG, processed_data_dir, len(processed.label_map))
     explainer = load_explainer(DEFAULT_EXPLAINER_CONFIG, processed_data_dir)
     test(processed, oracle, explainer)
 
